@@ -1,0 +1,12 @@
+names:
+- pill
+nc: 1
+roboflow:
+  license: CC BY 4.0
+  project: pill-detection-dtahz
+  url: https://universe.roboflow.com/diyas-workspace-hsyu7/pill-detection-dtahz/dataset/2
+  version: 2
+  workspace: diyas-workspace-hsyu7
+test: /home/dvm14/Desktop/edge_device_proj/Pill-Detection-2/test/images
+train: /home/dvm14/Desktop/edge_device_proj/Pill-Detection-2/train/images
+val: /home/dvm14/Desktop/edge_device_proj/Pill-Detection-2/valid/images
