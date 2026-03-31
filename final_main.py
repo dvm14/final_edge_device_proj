@@ -33,7 +33,7 @@ VOSK_MODEL_DIR = "../models/vosk-model-small-en-us-0.15"  # Update path as neede
 SAMPLE_RATE = 16000
 CHANNELS = 1
 RECORD_SECONDS = 5
-YOLO_MODEL_PATH = "yolov5/runs/train/pill_detection2/weights/best.pt"
+YOLO_MODEL_PATH = "yolov5/runs/train/pill_detection3/weights/best.pt"
 
 def setup_hardware():
     """Initialize all hardware components."""
