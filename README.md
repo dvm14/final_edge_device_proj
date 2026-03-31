@@ -36,7 +36,7 @@ An AI-powered medication dispenser that uses voice commands to receive instructi
 ```
 edge_device_proj/
 ├── README.md                          # This file
-├── final_pill_dispenser.py            # Main script (voice + camera)
+├── final_main.py                      # Main script (voice + camera)
 ├── capture_train_imgs.py              # Script to collect training images for YOLO
 ├── train_model.py                     # Script to download dataset and train YOLOv5
 ├── training_images/                   # Collected images for YOLOv5 training
