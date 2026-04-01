@@ -20,14 +20,13 @@ An AI-powered medication dispenser that uses voice commands to receive instructi
 
 ### Software
 - **Python 3**
-- **YOLOv5** - Object detection model for counting pills
+- **YOLOv5** - Object detection model for counting pills (trained on Google Colab, deployed to Pi)
 - **Vosk** - Offline speech recognition
 - **picamzero** - Camera interface
 - **gpiozero** - GPIO control for servo, sensors, and button
 - **PyTorch** - Deep learning framework for YOLOv5
 - **OpenCV** - Image processing
 - **sounddevice** - Audio recording
-- **scikit-learn** - For ultrasonic sensor model training (midterm)
 
 ---
 
@@ -35,26 +34,23 @@ An AI-powered medication dispenser that uses voice commands to receive instructi
 
 ```
 edge_device_proj/
-├── README.md                          # This file
-├── final_main.py                      # Main script (voice + camera)
-├── capture_train_imgs.py              # Script to collect training images for YOLO
-├── train_model.py                     # Script to download dataset and train YOLOv5
-├── training_images/                   # Collected images for YOLOv5 training
-│   └── pill_*.jpg                     # ~150+ images with varying pill counts
-├── yolov5/                            # YOLOv5 repository (cloned)
-│   ├── train.py                       # YOLOv5 training script
-│   ├── detect.py                      # YOLOv5 inference script
-│   └── runs/train/pill_detection3/    # Training results
-│       └── weights/
-│           ├── best.pt                # Best trained model (use this!)
-│           └── last.pt                # Final epoch model
-├── Pill-Detection-2/                  # Roboflow dataset (annotated images)
-│   ├── data.yaml                      # Dataset configuration
-│   ├── train/                         # Training images + labels
-│   ├── valid/                         # Validation images + labels
-│   └── test/                          # Test images + labels
-└── models/                            # Vosk speech models
-    └── vosk-model-small-en-us-0.15/   # English speech recognition model
+├── README.md                               # This file
+├── final_main.py                           # Main script (voice + camera)
+├── capture_train_imgs.py                   # Script to collect training images for YOLO
+├── train_pill_yolov5_colab.ipynb           # Google Colab notebook for training YOLOv5
+├── best.pt                                 # Trained YOLOv5 weights (copied from Colab)
+├── training_images/                        # Collected images for YOLOv5 training
+│   └── pill_*.jpg                          # ~150+ images with varying pill counts
+├── yolov5/                                 # YOLOv5 repository (cloned, used for inference)
+│   ├── detect.py                           # YOLOv5 inference script
+│   └── ...
+├── Pill-Detection-2/                       # Roboflow dataset (annotated images)
+│   ├── data.yaml                           # Dataset configuration
+│   ├── train/                              # Training images + labels
+│   ├── valid/                              # Validation images + labels
+│   └── test/                              # Test images + labels
+└── models/                                # Vosk speech models (one level up: ../models/)
+    └── vosk-model-small-en-us-0.15/       # English speech recognition model
 ```
 
 ---
@@ -65,7 +61,7 @@ edge_device_proj/
 
 **GPIO Pin Connections:**
 - **Servo Motor:**
-  - Signal → GPIO 21 (BCM)
+  - Signal → GPIO 16 (BCM)
   - VCC → 5V
   - GND → GND
 
@@ -79,12 +75,12 @@ edge_device_proj/
   - Connect to camera port on Raspberry Pi
   - Position camera above pill container
 
-### 2. Software Installation
+### 2. Software Installation (Raspberry Pi)
 
 #### Install System Dependencies
 ```bash
 sudo apt update
-sudo apt install python3-pip python3-venv portaudio19-dev python3-opencv pigpio
+sudo apt install python3-pip python3-venv portaudio19-dev python3-opencv pigpio i2c-tools
 
 # Start pigpio daemon (for servo control)
 sudo pigpiod
@@ -108,15 +104,9 @@ pip install opencv-python pillow pyyaml requests tqdm matplotlib seaborn pandas 
 
 # Speech recognition
 pip install vosk sounddevice numpy
-
-# Data science (for midterm)
-pip install scikit-learn
-
-# Roboflow (for dataset management)
-pip install roboflow
 ```
 
-#### Clone YOLOv5 Repository
+#### Clone YOLOv5 Repository (for inference only)
 ```bash
 git clone https://github.com/ultralytics/yolov5
 cd yolov5
@@ -126,7 +116,6 @@ cd ..
 
 #### Download Vosk Model
 ```bash
-# Download and extract Vosk speech model
 mkdir -p models
 cd models
 wget https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
@@ -134,47 +123,52 @@ unzip vosk-model-small-en-us-0.15.zip
 cd ..
 ```
 
-### 3. Data Collection and Model Training
+---
 
-#### Collect Training Images
+## Data Collection and Model Training
+
+> **Note:** Model training is done on Google Colab (free GPU), not on the Raspberry Pi. The Pi is only used for inference. Training on the Pi takes 4+ hours; Colab takes ~10 minutes.
+
+### Step 1: Collect Training Images
 ```bash
 python capture_train_imgs.py
 # Press ENTER to capture images with 0, 1, 2, 3, 4, 5+ pills
 # Capture ~150-200 images total
 ```
 
-#### Annotate Images (on Roboflow)
-1. Go to [roboflow.com](https://roboflow.com) and create account
+### Step 2: Annotate Images on Roboflow
+1. Go to [roboflow.com](https://roboflow.com) and create an account
 2. Create new project: "Pill Detection" (Object Detection)
 3. Upload images from `training_images/`
 4. Draw bounding boxes around each pill
 5. Use auto-labeling after ~30 manual annotations
 6. Generate dataset version (YOLOv5 PyTorch format)
-7. Export and note the API key
+7. Note your API key and workspace/project names
 
-#### Train YOLOv5 Model
+### Step 3: Train on Google Colab
+1. Open `train_pill_yolov5_colab.ipynb` in [colab.research.google.com](https://colab.research.google.com)
+2. Go to `Runtime > Change runtime type > T4 GPU`
+3. Fill in your Roboflow API key and project details in cell 3
+4. Run all cells in order
+5. The final cell downloads `best.pt` to your computer
+
+A well-trained model should reach **mAP50 ≥ 0.90** by epoch 100.
+
+### Step 4: Deploy Weights to Raspberry Pi
 ```bash
-# Update train_model.py with your Roboflow API key
-# Then run training (use tmux to prevent disconnection)
-tmux new -s training
-source .venv/bin/activate
-python train_model.py
-
-# Detach from tmux: Ctrl+B then D
-# Reattach later: tmux attach -t training
+# Copy best.pt from your laptop to the project root on the Pi
+scp ~/Downloads/best.pt dvm14@raspberrypi.local:~/Desktop/edge_device_proj/
 ```
-
-Training takes 30-60 minutes on Raspberry Pi. Model will be saved to:
-`yolov5/runs/train/pill_detection3/weights/best.pt`
 
 ---
 
 ## Running the Project
 
+### Manual Start
 ```bash
 source .venv/bin/activate
-sudo pigpiod  # Start pigpio daemon
-python final_pill_dispenser.py
+sudo pigpiod  # Start pigpio daemon if not already running
+python final_main.py
 ```
 
 **Usage:**
@@ -187,15 +181,75 @@ python final_pill_dispenser.py
 7. LCD shows: "Done! 3 pills dispensed"
 8. Returns to ready state after 5 seconds
 
-### Testing the YOLO Model
-```bash
-# Test inference on a single image
-python yolov5/detect.py \
-  --weights yolov5/runs/train/pill_detection3/weights/best.pt \
-  --source training_images/pill_20260329_141820.jpg \
-  --conf 0.4
+### Autostart on Boot (Recommended)
 
-# Results saved to yolov5/runs/detect/
+The project is configured to start automatically when the Pi is powered on using systemd services.
+
+#### pigpiod service
+```bash
+# Create /etc/systemd/system/pigpiod.service
+sudo nano /etc/systemd/system/pigpiod.service
+```
+```ini
+[Unit]
+Description=Pigpio Daemon
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/pigpiod
+ExecStop=/bin/systemctl kill pigpiod
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable pigpiod
+sudo systemctl start pigpiod
+```
+
+#### pill-dispenser service
+```bash
+sudo nano /etc/systemd/system/pill-dispenser.service
+```
+```ini
+[Unit]
+Description=Pill Dispenser
+After=network.target pigpiod.service
+
+[Service]
+ExecStartPre=/bin/sleep 10
+ExecStart=/home/dvm14/Desktop/edge_device_proj/.venv/bin/python /home/dvm14/Desktop/edge_device_proj/final_main.py
+WorkingDirectory=/home/dvm14/Desktop/edge_device_proj
+User=dvm14
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable pill-dispenser.service
+sudo systemctl start pill-dispenser.service
+```
+
+Once configured, simply plug in the Pi and the dispenser will start automatically within ~20 seconds.
+
+#### Useful service commands
+```bash
+# Check status
+sudo systemctl status pill-dispenser.service
+
+# View logs
+journalctl -u pill-dispenser.service -f
+
+# Stop manually
+sudo systemctl stop pill-dispenser.service
+
+# Restart
+sudo systemctl restart pill-dispenser.service
 ```
 
 ---
@@ -204,14 +258,14 @@ python yolov5/detect.py \
 
 ### Adjustable Parameters
 
-In `final_pill_dispenser.py`:
+In `final_main.py`:
 
 ```python
 # Pin assignments
-SERVO_PIN = 21
+SERVO_PIN = 16
 
 # Model paths
-YOLO_MODEL_PATH = "yolov5/runs/train/pill_detection3/weights/best.pt"
+YOLO_MODEL_PATH = "./best.pt"  # Place best.pt in the project root
 VOSK_MODEL_DIR = "../models/vosk-model-small-en-us-0.15"
 
 # Voice recognition settings
@@ -219,8 +273,21 @@ WAKE_PHRASE = "hi there"
 RECORD_SECONDS = 5
 
 # Servo control
-increment = 1  # Angle increment per step (degrees)
-max_angle = 180  # Maximum tipping angle
+increment = 4    # Angle increment per step (degrees)
+max_angle = 176  # Maximum tipping angle
+```
+
+---
+
+## Testing the YOLO Model
+```bash
+# Test inference on a single image
+python yolov5/detect.py \
+  --weights best.pt \
+  --source training_images/pill_20260329_141820.jpg \
+  --conf 0.4
+
+# Results saved to yolov5/runs/detect/
 ```
 
 ---
@@ -240,10 +307,10 @@ sudo raspi-config
 ### Servo Jitter
 ```bash
 # Make sure pigpio daemon is running
-sudo pigpiod
+sudo systemctl status pigpiod
 
-# Check if it's running
-ps aux | grep pigpio
+# Start it if not running
+sudo systemctl start pigpiod
 ```
 
 ### Microphone Not Working
@@ -256,17 +323,23 @@ python -c "import sounddevice as sd; import numpy as np; audio = sd.rec(16000, s
 ```
 
 ### Model Loading Errors
-- Ensure model path is correct in script
-- Check that training completed successfully
-- Verify `best.pt` exists in weights folder
+- Ensure model path in `final_main.py` matches where `best.pt` was copied
+- Verify the file exists: `ls yolov5/runs/train/pill_detection_colab/weights/`
 
 ### LCD Not Displaying
 ```bash
 # Check I2C devices
 sudo i2cdetect -y 1
+```
 
-# Install I2C tools if needed
-sudo apt install i2c-tools
+### Script Not Starting on Boot
+```bash
+# Check both services are active
+sudo systemctl status pigpiod
+sudo systemctl status pill-dispenser.service
+
+# View detailed logs
+journalctl -xeu pill-dispenser.service --no-pager | tail -30
 ```
 
 ---
@@ -279,8 +352,10 @@ This project builds upon a midterm version that used an ultrasonic distance sens
 - **Added PiCamera:** Real-time pill counting with YOLOv5 object detection
 - **Added Microphone:** Voice command input with Vosk speech recognition
 - **Wake phrase:** "Hi there" triggers listening mode
-- **Precise counting:** Stops dispensing at exact target count
+- **Pill counting:** Stops dispensing at least target count
 - **Enhanced feedback:** Real-time count display on LCD (e.g., "Pouring... 2/3 pills")
+- **Colab training:** YOLOv5 trained on Google Colab GPU for 100 epochs (mAP50 ~0.995), weights deployed to Pi
+- **Autostart:** Systemd services ensure the dispenser runs automatically on power-on
 
 ---
 
@@ -300,13 +375,14 @@ This project builds upon a midterm version that used an ultrasonic distance sens
 - **YOLOv5:** [Ultralytics YOLOv5](https://github.com/ultralytics/yolov5)
 - **Vosk Speech Recognition:** [alphacephei.com/vosk](https://alphacephei.com/vosk/)
 - **Roboflow:** Dataset annotation and augmentation
+- **Google Colab:** GPU training environment
 - **Course:** AIPI 590 - AI in the Physical World, Duke University
 
 ---
 
 ## License
 
-This project is for educational purposes as part of AIPI 590 coursework.
+This project is for educational purposes as part of AIPI 590 - AI in the Physical World coursework.
 
 ---
 

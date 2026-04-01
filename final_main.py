@@ -29,11 +29,11 @@ vosk_recognizer = None
 WAKE_PHRASE = "hi there"
 
 # Vosk settings
-VOSK_MODEL_DIR = "../models/vosk-model-small-en-us-0.15"  # Update path as needed
-SAMPLE_RATE = 16000
+VOSK_MODEL_DIR = "vosk-model-small-en-us-0.15"  # Update path as needed
+SAMPLE_RATE = 44100
 CHANNELS = 1
 RECORD_SECONDS = 5
-YOLO_MODEL_PATH = "yolov5/runs/train/pill_detection3/weights/best.pt"
+YOLO_MODEL_PATH = "./best.pt"
 
 def setup_hardware():
     """Initialize all hardware components."""
@@ -89,19 +89,22 @@ def count_pills_in_frame():
     
     # Capture frame
     frame = camera.capture_array()
+    print("Frame captured for pill counting.")
     
     # Convert RGB to BGR for OpenCV/YOLO
     if len(frame.shape) == 3 and frame.shape[2] == 3:
         frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     else:
         frame_bgr = frame
-    
+    print("Frame converted to BGR format.")
     # Run inference
     results = yolo_model(frame_bgr)
+    print("Inference completed.")
     
     # Count detections
     detections = results.pandas().xyxy[0]  # Pandas DataFrame
     pill_count = len(detections)
+    print(f"Detected {pill_count} pills.")
     
     return pill_count
 
@@ -191,13 +194,28 @@ def get_voice_command():
 
 def voice_to_number(text):
     """
-    Extract number from voice command like 'I need 3 vitamins'.
-    Returns: integer or None
+    Extract number (1-5) from voice command as either digits or words.
     """
-    # Simple regex to find numbers
-    numbers = re.findall(r'\d+', text)
-    if numbers:
-        return int(numbers[0])
+    # Define the mapping
+    number_map = {
+        "one": 1, "1": 1,
+        "two": 2, "2": 2,
+        "three": 3, "3": 3,
+        "four": 4, "4": 4,
+        "five": 5, "5": 5
+    }
+    
+    # Convert text to lowercase to catch "One" or "ONE"
+    text = text.lower()
+    
+    # Create a regex pattern that looks for any of the keys in our map
+    # This joins them like: (one|1|two|2|...)
+    pattern = r'\b(' + '|'.join(number_map.keys()) + r')\b'
+    
+    match = re.search(pattern, text)
+    if match:
+        return number_map[match.group(0)]
+        
     return None
 
 def dispense_pills(target_count):
@@ -206,8 +224,8 @@ def dispense_pills(target_count):
     Stops when target count is reached.
     """
     current_angle = 0
-    increment = 1
-    max_angle = 180
+    increment = 4
+    max_angle = 176
     
     set_servo_angle(current_angle)
     sleep(1)
@@ -238,7 +256,7 @@ def dispense_pills(target_count):
         print("Dispensing interrupted.")
     
     # Return to starting position
-    set_servo_angle(0)
+    #set_servo_angle(0)
     sleep(1)
     
     return pill_count
@@ -250,6 +268,7 @@ def main():
     # Initialize hardware and model
     setup_hardware()
     load_yolo_model()
+    set_servo_angle(0)
     
     try:
         while True:
